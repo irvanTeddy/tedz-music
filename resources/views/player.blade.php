@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#0c1511">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/svg+xml" href="/icons/logo.svg">
-    <link rel="icon" type="image/png" href="/icons/icon-192.png">
+    <link rel="icon" type="image/png" href="/icons/icon-51.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -189,6 +189,11 @@
             touch-action: pan-y;
         }
 
+        .fade-y {
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
+        }
+
         .noscroll {
             scrollbar-width: none;
         }
@@ -259,7 +264,7 @@
                         <rect x="236" y="176" width="40" height="160" rx="14" fill="#0c1511" />
                     </g>
                 </svg>
-                <h1 class="font-display font-extrabold text-xl tracking-tight">Tedz <span class="text-sun">Music</span></h1>
+                <h1 class="font-display font-extrabold text-xl tracking-tight">Tedz <span class="text-sun">Music.</span></h1>
             </div>
             <label class="relative w-full max-w-xs hidden lg:block">
                 <span class="sr-only">Cari lagu atau artis di Audius</span>
@@ -368,7 +373,7 @@
                 </div>
 
                 <!-- Cover: persegi di mobile (geser kiri/kanan ganti lagu), piringan di desktop -->
-                <div class="cover relative aspect-square mx-auto my-3 w-[min(72vw,34dvh)] lg:w-[clamp(7rem,28dvh,15rem)] transition-transform duration-300"
+                <div v-if="!showLyrics" class="cover relative aspect-square mx-auto my-3 w-[min(72vw,34dvh)] lg:w-[clamp(7rem,28dvh,15rem)] transition-transform duration-300"
                     :class="isPlaying ? '' : 'scale-95'"
                     v-on:touchstart.passive="tStart" v-on:touchend="tEnd">
                     <div class="disc w-full h-full rounded-full overflow-hidden border-[6px] border-line shadow-2xl bg-panel" :class="isPlaying ? 'on' : ''">
@@ -377,6 +382,31 @@
                     </div>
                     <div class="absolute inset-0 grid place-items-center pointer-events-none">
                         <div class="w-8 h-8 rounded-full bg-ink border-4 border-line"></div>
+                    </div>
+                </div>
+
+                <div v-else class="my-3">
+                    <div ref="lyricsEl" data-lyrics
+                        class="relative overflow-y-auto overscroll-contain noscroll fade-y h-[calc(100dvh_-_20.5rem)] min-h-[10rem] lg:h-[clamp(9rem,34dvh,17rem)]">
+                        <template v-if="lyrics.status === 'ok'">
+                            <div class="h-3"></div>
+                            <p v-for="(l, i) in lyrics.lines" :key="i" class="px-2 py-0.5 font-display font-bold text-xl lg:text-lg leading-snug text-white/85" v-text="l.text || '\u00a0'"></p>
+                            <div class="h-3"></div>
+                        </template>
+                        <div v-else class="h-full grid place-items-center text-center px-6 text-mist">
+                            <div v-if="lyrics.status === 'loading'" class="w-full space-y-3" aria-busy="true">
+                                <div class="skel h-6 rounded-lg w-4/5"></div>
+                                <div class="skel h-6 rounded-lg w-3/5"></div>
+                                <div class="skel h-6 rounded-lg w-2/3"></div>
+                            </div>
+                            <p v-else-if="lyrics.status === 'instrumental'">Lagu ini instrumental.</p>
+                            <div v-else-if="lyrics.status === 'error'">
+                                <p>Lirik gagal dimuat.</p>
+                                <button type="button" v-on:click="loadLyrics" class="mt-3 px-4 h-10 rounded-full bg-sun text-ink font-bold text-sm">Coba lagi</button>
+                            </div>
+                            <p v-else-if="lyrics.status === 'none'">Lirik belum tersedia untuk lagu ini.</p>
+                            <p v-else>Putar lagu untuk melihat lirik.</p>
+                        </div>
                     </div>
                 </div>
 
@@ -432,17 +462,29 @@
                     </button>
                 </div>
 
-                <div v-if="canVolume" class="flex items-center gap-2 mt-0 text-mist">
-                    <button type="button" v-on:click="toggleMute" class="w-11 h-11 -ml-2 grid place-items-center rounded-full shrink-0 hover:text-white" :aria-label="volume === 0 ? 'Aktifkan suara' : 'Bisukan'">
+                <div class="flex items-center gap-2 text-mist">
+                    <template v-if="canVolume">
+                        <button type="button" v-on:click="toggleMute" class="w-11 h-11 -ml-2 grid place-items-center rounded-full shrink-0 hover:text-white" :aria-label="volume === 0 ? 'Aktifkan suara' : 'Bisukan'">
+                            <svg class="stroke ico" viewBox="0 0 24 24">
+                                <path d="M11 5 6 9H2v6h4l5 4z" />
+                                <path v-if="volume > 0" d="M16 9a4 4 0 0 1 0 6" />
+                                <path v-else d="m17 9 5 6m0-6-5 6" />
+                            </svg>
+                        </button>
+                        <input type="range" min="0" max="1" step="0.01" v-model.number="volume" :style="{'--p': (volume*100) + '%'}" aria-label="Volume" class="flex-1 min-w-0">
+                    </template>
+                    <p v-else class="flex-1 text-xs">Atur volume dengan tombol volume di sisi HP.</p>
+                    <button type="button" v-on:click="showLyrics = !showLyrics" :disabled="!current" :aria-pressed="showLyrics" aria-label="Lirik"
+                        class="relative w-11 h-11 -mr-1 grid place-items-center rounded-full shrink-0 transition active:scale-90 disabled:opacity-40"
+                        :class="showLyrics ? 'text-sun' : 'text-mist hover:text-white'">
                         <svg class="stroke ico" viewBox="0 0 24 24">
-                            <path d="M11 5 6 9H2v6h4l5 4z" />
-                            <path v-if="volume > 0" d="M16 9a4 4 0 0 1 0 6" />
-                            <path v-else d="m17 9 5 6m0-6-5 6" />
+                            <path d="m11 7.601-5.994 8.19a1 1 0 0 0 .1 1.298l.817.818a1 1 0 0 0 1.314.087L15.09 12" />
+                            <path d="M16.5 21.174C15.5 20.5 14.372 20 13 20c-2.058 0-3.928 2.356-6 2-2.072-.356-2.775-3.369-1.5-4.5" />
+                            <circle cx="16" cy="7" r="5" />
                         </svg>
+                        <span v-if="showLyrics" class="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-sun"></span>
                     </button>
-                    <input type="range" min="0" max="1" step="0.01" v-model.number="volume" :style="{'--p': (volume*100) + '%'}" aria-label="Volume">
                 </div>
-                <p v-else class="mt-2 text-center text-xs text-mist">Atur volume dengan tombol volume di sisi HP.</p>
 
                 <audio ref="audio" preload="none"
                     v-on:play="isPlaying=true" v-on:pause="onPause"
@@ -697,6 +739,152 @@
                 });
                 const pct = computed(() => (dur.value ? Math.min(100, (time.value / dur.value) * 100) : 0));
 
+                // ===== Lirik (LRCLIB) =====
+                const LRC = 'https://lrclib.net/api';
+                const showLyrics = ref(store('tedz_lyrics', false));
+                const lyrics = ref({
+                    status: 'idle',
+                    lines: [],
+                    synced: false
+                });
+                const lyricsEl = ref(null);
+                const lyricCache = new Map();
+                let lyricCtrl = null;
+
+                const lyricQueries = s => {
+                    const clean = x => x.replace(/\(.*?\)|\[.*?\]/g, '').replace(/\s+(feat|ft)\.?\s.*$/i, '').replace(/\s+/g, ' ').trim();
+                    const artist = clean(s.user.name),
+                        title = clean(s.title);
+                    const parts = s.title.split(/\s[-–—]\s/).map(clean).filter(Boolean);
+                    const rest = parts.length > 1 ? parts.slice(1).join(' - ') : title;
+                    const enc = encodeURIComponent,
+                        tracks = new Set([title, rest]),
+                        urls = new Set();
+                    if (parts.length > 1) tracks.add(parts[0]);
+                    // artis + judul (dari "Artis - Judul" maupun nama akun), lalu judul saja, lalu pencarian bebas
+                    if (parts.length > 1) urls.add(`${LRC}/search?track_name=${enc(rest)}&artist_name=${enc(parts[0])}`);
+                    urls.add(`${LRC}/search?track_name=${enc(rest)}&artist_name=${enc(artist)}`);
+                    tracks.forEach(t => {
+                        if (t) urls.add(`${LRC}/search?track_name=${enc(t)}`);
+                    });
+                    urls.add(`${LRC}/search?q=${enc(artist + ' ' + rest)}`);
+                    return {
+                        urls: [...urls],
+                        tracks: [...tracks],
+                        artists: [artist, ...(parts.length > 1 ? [parts[0]] : [])].filter(Boolean)
+                    };
+                };
+                const norm = x => (x || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+                const baseName = x => norm((x || '').replace(/\(.*?\)|\[.*?\]/g, '').replace(/\s+(feat|ft)\.?\s.*$/i, ''));
+                const artistMatch = (a, b) => {
+                    a = norm(a);
+                    b = norm(b);
+                    return !!a && !!b && (a === b || (Math.min(a.length, b.length) >= 3 && (a.includes(b) || b.includes(a))));
+                };
+                const findLyrics = async (s, signal) => {
+                    const {
+                        urls,
+                        tracks,
+                        artists
+                    } = lyricQueries(s);
+                    let fails = 0;
+                    const lists = await Promise.all(urls.map(u => fetch(u, {
+                            signal
+                        })
+                        .then(r => {
+                            if (!r.ok) {
+                                fails++;
+                                return [];
+                            }
+                            return r.json();
+                        })
+                        .catch(e => {
+                            if (e.name === 'AbortError') throw e;
+                            fails++;
+                            return [];
+                        })));
+                    if (fails === urls.length) throw new Error('Semua permintaan lirik gagal');
+                    const seen = new Set(),
+                        all = [];
+                    lists.flat().forEach(x => {
+                        if (x && !seen.has(x.id)) {
+                            seen.add(x.id);
+                            all.push(x);
+                        }
+                    });
+                    const names = tracks.map(baseName).filter(Boolean);
+                    // Ketat: judul harus sama persis. Artis cocok -> durasi maks 6 dtk; artis beda (mis. cover) -> durasi maks 3 dtk.
+                    const cand = all
+                        .filter(x => (x.syncedLyrics || x.plainLyrics || x.instrumental) && names.includes(baseName(x.trackName)))
+                        .map(x => ({
+                            x,
+                            art: artists.some(a => artistMatch(a, x.artistName)),
+                            gap: Math.abs((x.duration || 0) - (s.duration || 0))
+                        }))
+                        .filter(c => (s.duration && c.x.duration) ?
+                            (c.art ? c.gap <= 6 : (c.gap <= 3 && baseName(c.x.trackName).length >= 5)) :
+                            c.art);
+                    cand.sort((p, q) => (q.art - p.art) || ((p.x.syncedLyrics ? 0 : 1) - (q.x.syncedLyrics ? 0 : 1)) || (p.gap - q.gap));
+                    console.debug('[Lirik]', s.title, '|', s.user.name, '| durasi', s.duration, '| kandidat', all.length, '| lolos', cand.length, cand[0] ? cand[0].x : '');
+                    return cand[0] ? cand[0].x : null;
+                };
+                // Lirik ditampilkan statis: pakai teks biasa, atau teks dari lirik bertanda waktu tanpa penandanya
+                const parseLyrics = hit => {
+                    if (!hit) return {
+                        status: 'none',
+                        lines: [],
+                        synced: false
+                    };
+                    const raw = hit.plainLyrics || (hit.syncedLyrics || '').replace(/\[[^\]]*\]/g, '');
+                    if (!raw.trim()) return {
+                        status: hit.instrumental ? 'instrumental' : 'none',
+                        lines: [],
+                        synced: false
+                    };
+                    const lines = raw.split('\n').map(text => ({
+                        text: text.trim()
+                    }));
+                    while (lines.length && !lines[0].text) lines.shift();
+                    while (lines.length && !lines[lines.length - 1].text) lines.pop();
+                    return {
+                        status: 'ok',
+                        lines,
+                        synced: false
+                    };
+                };
+                const loadLyrics = async () => {
+                    const s = current.value;
+                    if (!showLyrics.value || !s) return;
+                    if (lyricCache.has(s.id)) {
+                        lyrics.value = lyricCache.get(s.id);
+                        return;
+                    }
+                    if (lyricCtrl) lyricCtrl.abort();
+                    lyricCtrl = new AbortController();
+                    lyrics.value = {
+                        status: 'loading',
+                        lines: [],
+                        synced: false
+                    };
+                    let out;
+                    try {
+                        out = parseLyrics(await findLyrics(s, lyricCtrl.signal));
+                        lyricCache.set(s.id, out);
+                    } catch (e) {
+                        if (e.name === 'AbortError') return;
+                        console.error('Gagal memuat lirik:', e);
+                        out = {
+                            status: 'error',
+                            lines: [],
+                            synced: false
+                        };
+                    }
+                    if (current.value && current.value.id === s.id) lyrics.value = out;
+                };
+
+                watch([showLyrics, () => current.value && current.value.id], () => loadLyrics());
+                watch(showLyrics, v => put('tedz_lyrics', v));
+
                 // Favorit
                 const slim = s => ({
                     id: s.id,
@@ -819,6 +1007,7 @@
                 // Gestur: tarik sheet ke bawah untuk menutup
                 let dStart = null;
                 const dS = e => {
+                    if (e.target.closest && e.target.closest('[data-lyrics]')) return;
                     if (expanded.value && sheet.value.scrollTop <= 0) dStart = e.touches[0].clientY;
                 };
                 const dM = e => {
@@ -887,6 +1076,10 @@
                     audio,
                     sheet,
                     searchEl,
+                    showLyrics,
+                    lyrics,
+                    lyricsEl,
+                    loadLyrics,
                     time,
                     dur,
                     volume,
